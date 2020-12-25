@@ -32,7 +32,7 @@ pub struct Cpu {
     accumulator: u8,
 
     /// Index register X.
-    x: u8,
+    pub x: u8,
 
     /// Index register Y.
     y: u8,

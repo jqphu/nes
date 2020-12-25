@@ -11,22 +11,20 @@ pub trait Operation {
 
 /// Read in the next opcode and set up PC.
 pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
-    let opcode = {
-        let pc = cpu.program_counter as usize;
-        let opcode_raw = cpu.memory[pc];
+    let pc = cpu.program_counter as usize;
+    let opcode_raw = cpu.memory[pc];
 
-        match opcode_raw {
-            0x4C | 0x6C => Jmp::new(opcode_raw, cpu),
-            _ => panic!("Unsupported {}", opcode_raw),
-        }
-    };
-
-    Box::new(opcode)
+    match opcode_raw {
+        0x4C | 0x6C => Box::new(Jmp::new(opcode_raw, cpu)),
+        0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
+        _ => panic!("Unsupported {:X}", opcode_raw),
+    }
 }
 
 enum AddressingMode {
     Absolute,
     Indirect,
+    Immediate,
 }
 
 impl AddressingMode {
@@ -36,6 +34,7 @@ impl AddressingMode {
         match &self {
             AddressingMode::Absolute => 3,
             AddressingMode::Indirect => 3,
+            AddressingMode::Immediate => 2,
         }
     }
 }
@@ -65,10 +64,11 @@ impl Operation for Jmp {
         let addr_string = match self.mode {
             AddressingMode::Absolute => format!("${:X}", self.addr),
             AddressingMode::Indirect => panic!("Unsupproted!"),
+            _ => panic!("Unexpected!"),
         };
 
         format!(
-            "{:X} {:X} {:X}  JMP  {}",
+            "{:02X} {:02X} {:02X}  JMP  {}",
             self.opcode_raw,
             self.addr_to_bytes().0,
             self.addr_to_bytes().1,
@@ -82,12 +82,14 @@ impl Jmp {
         let pc = cpu.program_counter as usize;
         let addr = Jmp::bytes_to_addr(cpu.memory[pc + 1], cpu.memory[pc + 2]);
         match opcode_raw {
+            // Absolute
             0x4C => Jmp {
                 opcode_raw,
                 mode: AddressingMode::Absolute,
                 cycles: 3,
                 addr,
             },
+            // Indirect
             0x6C => Jmp {
                 opcode_raw,
                 mode: AddressingMode::Indirect,
@@ -106,5 +108,58 @@ impl Jmp {
 
     fn addr_to_bytes(&self) -> (u8, u8) {
         (self.addr as u8, (self.addr >> 8) as u8)
+    }
+}
+
+struct Ldx {
+    opcode_raw: u8,
+
+    /// Only Absolute and Indirect are valid modes.
+    mode: AddressingMode,
+
+    /// Number of cycles this operation takes.
+    cycles: u8,
+
+    /// Value to load.
+    value: u8,
+}
+
+/// TODO: Generalize addressing mode to a separate module.
+impl Ldx {
+    pub fn new(opcode_raw: u8, cpu: &Cpu) -> Self {
+        let pc = cpu.program_counter as usize;
+        let value = cpu.memory[pc + 1];
+        match opcode_raw {
+            // Immediate.
+            0xA2 => Ldx {
+                opcode_raw,
+                mode: AddressingMode::Immediate,
+                cycles: 2,
+                value,
+            },
+            _ => panic!("Unsupported {}", opcode_raw),
+        }
+    }
+}
+
+impl Operation for Ldx {
+    /// JMP simply moves to the address.
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += self.mode.get_bytes() as u16;
+        cpu.cycles += u64::from(self.cycles);
+        cpu.x = self.value;
+    }
+
+    fn dump(&self) -> String {
+        let addr_string = match self.mode {
+            AddressingMode::Immediate => format!("#${:02X}", self.value),
+            AddressingMode::Absolute => format!("${:02X}", self.value),
+            AddressingMode::Indirect => panic!("Unsupproted!"),
+        };
+
+        format!(
+            "{:02X} {:02X}     LDX  {}",
+            self.opcode_raw, self.value, addr_string
+        )
     }
 }
