@@ -3,6 +3,7 @@
 ///
 /// The NMOS 65xx processors have 256 bytes of stack memory ranging from $0100 to $01FF.
 use log::info;
+use std::convert::From;
 
 use crate::opcode;
 
@@ -26,7 +27,7 @@ pub struct Cpu {
     /// Processor Status.
     ///
     /// Contains flags to denote the process status.
-    status: ProcessorStatus,
+    pub status: ProcessorStatus,
 
     /// Accumulator.
     accumulator: u8,
@@ -62,7 +63,7 @@ impl Cpu {
             // Hard coded to start at ROM.
             program_counter: 0xc000,
             stack_pointer: 0xfd,
-            status: ProcessorStatus(0),
+            status: ProcessorStatus::new(),
             accumulator: 0,
             x: 0,
             y: 0,
@@ -81,7 +82,17 @@ impl Cpu {
     pub fn run(&mut self) {
         loop {
             let operation = opcode::next(self);
-            info!("{:X}  {}", self.program_counter, &operation.dump());
+            info!(
+                "{:X}  {} \t A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP: {:02X} CYC: {}",
+                self.program_counter,
+                &operation.dump(self),
+                self.accumulator,
+                self.x,
+                self.y,
+                u8::from(&self.status),
+                self.stack_pointer,
+                self.cycles
+            );
 
             operation.execute(self);
         }
@@ -90,4 +101,66 @@ impl Cpu {
 
 /// A 8 bit register that has the processor state.
 /// TODO: Expand this.
-struct ProcessorStatus(u8);
+pub struct ProcessorStatus {
+    /// Carry (C) Flag
+    carry: bool,
+
+    /// Zero (Z) Flag
+    zero: bool,
+
+    /// Interrupt Disable (I) Flag
+    interrupt_disable: bool,
+
+    /// Overflow Flag
+    overflow: bool,
+
+    /// Bit 4, not used by CPU.
+    b_flag: bool,
+
+    /// Negative flag.
+    negative: bool,
+    // Decimal flag not used on NES.
+}
+
+impl ProcessorStatus {
+    fn new() -> Self {
+        ProcessorStatus {
+            carry: false,
+            zero: false,
+            b_flag: false,
+            interrupt_disable: true,
+            overflow: false,
+            negative: false,
+        }
+    }
+
+    pub fn update(&mut self, value: u8) {
+        if value == 0 {
+            self.zero = true;
+        }
+
+        // Bit 7 is set
+        if (value & 0b10000000) == 1 {
+            self.negative = true;
+        }
+    }
+}
+
+impl From<&ProcessorStatus> for u8 {
+    fn from(src: &ProcessorStatus) -> u8 {
+        // Decimal is not used in NES.
+        let decimal = 0u8;
+
+        // Upper bit of b flag (bit 5 of status) is always 1.
+        let b_flag_upper = 1u8;
+
+        (src.carry as u8)
+            | (src.zero as u8) << 1
+            | (src.interrupt_disable as u8) << 2
+            | decimal << 3
+            | (src.b_flag as u8) << 4
+            | b_flag_upper << 5
+            | (src.overflow as u8) << 6
+            | (src.negative as u8) << 7
+    }
+}

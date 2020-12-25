@@ -6,7 +6,7 @@ pub trait Operation {
     fn execute(&self, cpu: &mut Cpu);
 
     /// Dump the opcode with the read values.
-    fn dump(&self) -> String;
+    fn dump(&self, cpu: &Cpu) -> String;
 }
 
 /// Read in the next opcode and set up PC.
@@ -17,11 +17,13 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
     match opcode_raw {
         0x4C | 0x6C => Box::new(Jmp::new(opcode_raw, cpu)),
         0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
+        0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode_raw, cpu)),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
 
 enum AddressingMode {
+    ZeroPage,
     Absolute,
     Indirect,
     Immediate,
@@ -35,6 +37,7 @@ impl AddressingMode {
             AddressingMode::Absolute => 3,
             AddressingMode::Indirect => 3,
             AddressingMode::Immediate => 2,
+            AddressingMode::ZeroPage => 2,
         }
     }
 }
@@ -60,7 +63,7 @@ impl Operation for Jmp {
         cpu.cycles += u64::from(self.cycles);
     }
 
-    fn dump(&self) -> String {
+    fn dump(&self, _cpu: &Cpu) -> String {
         let addr_string = match self.mode {
             AddressingMode::Absolute => format!("${:X}", self.addr),
             AddressingMode::Indirect => panic!("Unsupproted!"),
@@ -148,18 +151,70 @@ impl Operation for Ldx {
         cpu.program_counter += self.mode.get_bytes() as u16;
         cpu.cycles += u64::from(self.cycles);
         cpu.x = self.value;
+
+        cpu.status.update(cpu.x);
     }
 
-    fn dump(&self) -> String {
+    fn dump(&self, _cpu: &Cpu) -> String {
         let addr_string = match self.mode {
             AddressingMode::Immediate => format!("#${:02X}", self.value),
             AddressingMode::Absolute => format!("${:02X}", self.value),
-            AddressingMode::Indirect => panic!("Unsupproted!"),
+            _ => panic!("Unsupproted!"),
         };
 
         format!(
             "{:02X} {:02X}     LDX  {}",
             self.opcode_raw, self.value, addr_string
+        )
+    }
+}
+
+struct Stx {
+    opcode_raw: u8,
+
+    /// Only Absolute and Indirect are valid modes.
+    mode: AddressingMode,
+
+    /// Number of cycles this operation takes.
+    cycles: u8,
+
+    /// Address to store value in register x.
+    zero_page_addr: u8,
+}
+
+impl Stx {
+    pub fn new(opcode_raw: u8, cpu: &Cpu) -> Self {
+        let pc = cpu.program_counter as usize;
+        let zero_page_addr = cpu.memory[pc + 1];
+        match opcode_raw {
+            // Immediate.
+            0x86 => Stx {
+                opcode_raw,
+                mode: AddressingMode::ZeroPage,
+                cycles: 3,
+                zero_page_addr,
+            },
+            _ => panic!("Unsupported {}", opcode_raw),
+        }
+    }
+}
+
+impl Operation for Stx {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += self.mode.get_bytes() as u16;
+        cpu.memory[self.zero_page_addr as usize] = cpu.x;
+        cpu.cycles += u64::from(self.cycles);
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        let addr_string = match self.mode {
+            AddressingMode::ZeroPage => format!("${:02X} = {:02X}", self.zero_page_addr, cpu.x),
+            _ => panic!("Unsupported!"),
+        };
+
+        format!(
+            "{:02X} {:02X}     STX  {}",
+            self.opcode_raw, self.zero_page_addr, addr_string
         )
     }
 }

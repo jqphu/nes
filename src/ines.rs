@@ -2,12 +2,9 @@ use anyhow::{anyhow, Result};
 use log::debug;
 use std::fs::File;
 use std::io::Read;
-use std::mem;
 
 /// iNes Structure.
 pub struct NesFile {
-    /// Filename
-    filename: String,
     // Header for the given file.
     // header: Header,
 
@@ -89,6 +86,6 @@ impl NesFile {
             buffer
         };
 
-        Ok(NesFile { filename, prg_rom })
+        Ok(NesFile { prg_rom })
     }
 }
