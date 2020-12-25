@@ -3,7 +3,9 @@ use clap::Clap;
 use env_logger;
 use log::info;
 
+mod cpu;
 mod ines;
+mod opcode;
 
 /// Basic emulator for the NES.
 #[derive(Clap)]
@@ -20,7 +22,11 @@ fn main() -> Result<()> {
 
     info!("Loading ROM \"{}\"", &opts.rom);
 
-    let _result = ines::NesFile::new(opts.rom)?;
+    let nes_file = ines::NesFile::new(opts.rom)?;
+
+    let mut cpu = cpu::Cpu::new(nes_file);
+
+    cpu.run();
 
     Ok(())
 }

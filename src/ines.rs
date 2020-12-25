@@ -12,7 +12,7 @@ pub struct NesFile {
     // header: Header,
 
     // PrgRom buffer.
-    prg_rom: Vec<u8>,
+    pub prg_rom: Vec<u8>,
 }
 
 /// Header of a iNes ROM
