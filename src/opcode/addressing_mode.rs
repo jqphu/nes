@@ -14,7 +14,7 @@ pub enum AddRegister {
 }
 
 pub enum AddressMode {
-    Accumulate,
+    _Accumulate,
 
     Immediate {
         value: u8,
@@ -80,7 +80,7 @@ impl AddressMode {
 
     pub fn to_value(&self, cpu: &Cpu) -> u8 {
         match &self {
-            AddressMode::Accumulate => cpu.a,
+            AddressMode::_Accumulate => cpu.a,
             AddressMode::Immediate { value } => *value,
             _ => cpu.memory[self.to_addr(cpu).unwrap() as usize],
         }
@@ -89,7 +89,7 @@ impl AddressMode {
     /// Convert the address mode to a string.
     pub fn to_string(&self, cpu: &Cpu) -> String {
         match &self {
-            AddressMode::Accumulate => return "A".to_string(),
+            AddressMode::_Accumulate => return "A".to_string(),
             AddressMode::Immediate { value } => return format!("#${:02X}", value),
             _ => (),
         };
@@ -117,7 +117,7 @@ impl AddressMode {
 
     pub fn value_to_string(&self) -> String {
         match &self {
-            AddressMode::Accumulate => "A".to_string(),
+            AddressMode::_Accumulate => "A".to_string(),
             AddressMode::Relative { offset: value } => {
                 format!("{:02X}", *value as u8)
             }

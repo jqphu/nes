@@ -192,12 +192,12 @@ impl Stack {
         self.stack_pointer -= 2;
     }
 
-    pub fn push(&mut self, memory: &mut AddressSpace, value: u8) {
+    pub fn _push(&mut self, memory: &mut AddressSpace, value: u8) {
         memory[self.stack_pointer] = value;
         self.stack_pointer -= 1;
     }
 
-    pub fn pop(&mut self, memory: &mut AddressSpace) -> u8 {
+    pub fn _pop(&mut self, memory: &mut AddressSpace) -> u8 {
         let value = memory[self.stack_pointer + 1];
 
         self.stack_pointer += 1;

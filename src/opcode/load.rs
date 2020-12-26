@@ -20,7 +20,7 @@ impl Load {
         Some(Load {
             mode: Load::get_mode(opcode, cpu),
             register,
-            opcode: opcode,
+            opcode,
         })
     }
 

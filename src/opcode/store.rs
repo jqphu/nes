@@ -20,7 +20,7 @@ impl Store {
         Some(Store {
             mode: Store::get_mode(opcode, cpu),
             register,
-            opcode: opcode,
+            opcode,
         })
     }
 
