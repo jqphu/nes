@@ -7,7 +7,7 @@ const PAGE_SIZE: u16 = 0x100;
 
 /// If the src address is on a different page to dest address.
 fn is_on_different_pages(src: u16, dest: u16) -> bool {
-    return src / PAGE_SIZE != dest / PAGE_SIZE;
+    src / PAGE_SIZE != dest / PAGE_SIZE
 }
 
 pub struct Branch {
@@ -99,14 +99,10 @@ impl Branch {
     pub fn new(opcode: u8, cpu: &Cpu) -> Option<Self> {
         let relative_branch_offset = cpu.memory[(cpu.program_counter + 1) as usize];
 
-        let branch_type = BranchType::from_opcode(opcode);
-
-        if branch_type.is_none() {
-            return None;
-        }
+        let branch_type = BranchType::from_opcode(opcode)?;
 
         Some(Branch {
-            branch_type: branch_type.unwrap(),
+            branch_type,
             relative_branch_offset,
         })
     }

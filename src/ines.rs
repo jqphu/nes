@@ -63,7 +63,7 @@ impl NesFile {
             // Initialized immediately after.
             let mut header_raw: [u8; Header::HEADER_SIZE_BYTES] =
                 unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-            f.read(&mut header_raw)?;
+            f.read_exact(&mut header_raw)?;
 
             debug!("Received header: {:x?}", &header_raw);
 
@@ -75,7 +75,8 @@ impl NesFile {
 
             debug!("Rom size is: {}", &header.get_prg_rom_size());
 
-            f.take(header.get_prg_rom_size() as u64).read(&mut buffer)?;
+            f.take(header.get_prg_rom_size() as u64)
+                .read_exact(&mut buffer)?;
 
             debug!("Received prg rom: {:x?}", &buffer);
 
