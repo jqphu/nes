@@ -1,8 +1,8 @@
 use crate::cpu::Cpu;
 use crate::opcode::*;
 
-/// Register to be used with AddressMode.
-enum Register {
+/// AddRegister to be used with AddressMode.
+pub enum AddRegister {
     // Don't add any registers
     None,
 
@@ -12,8 +12,6 @@ enum Register {
     // Add Y register.
     Y,
 }
-
-// TODO: Immediate/Accumulate
 
 pub enum AddressMode {
     Accumulate,
@@ -32,19 +30,19 @@ pub enum AddressMode {
     /// @warning We can wrap around, but still can only access first 256 bytes of memory (e.g.
     /// always truncate)!
     ZeroPage {
-        register: Register,
+        register: AddRegister,
         offset: u8,
     },
 
     /// Index absolutely using full 16 bit address.
     Absolute {
-        register: Register,
+        register: AddRegister,
         address: u16,
     },
 
     /// Access the location to extract the real jump location from.
     Indirect {
-        register: Register,
+        register: AddRegister,
         address_to_read_indirect: u16,
     },
 }
@@ -57,22 +55,22 @@ impl AddressMode {
                 Some((cpu.program_counter as i64 + *offset as i64) as u16)
             }
             AddressMode::ZeroPage { register, offset } => match register {
-                Register::None => Some(*offset as u16),
+                AddRegister::None => Some(*offset as u16),
 
                 // Intentionally wrap over.
-                Register::X => Some((cpu.x + *offset) as u16),
-                Register::Y => Some((cpu.y + *offset) as u16),
+                AddRegister::X => Some((cpu.x + *offset) as u16),
+                AddRegister::Y => Some((cpu.y + *offset) as u16),
             },
             AddressMode::Absolute { register, address } => match register {
-                Register::None => Some(*address),
+                AddRegister::None => Some(*address),
 
                 // Intentionally wrap over.
-                Register::X => Some((cpu.x as u16 + *address) as u16),
-                Register::Y => Some((cpu.y as u16 + *address) as u16),
+                AddRegister::X => Some((cpu.x as u16 + *address) as u16),
+                AddRegister::Y => Some((cpu.y as u16 + *address) as u16),
             },
             AddressMode::Indirect {
-                register,
-                address_to_read_indirect,
+                register: _,
+                address_to_read_indirect: _,
             } => {
                 panic!("Unsupported!");
             }

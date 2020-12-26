@@ -1,15 +1,8 @@
 use crate::cpu::Cpu;
 use crate::opcode::addressing_mode::AddressMode;
 use crate::opcode::Operation;
+use crate::opcode::*;
 use std::string::ToString;
-
-/// Each page is 256 bytes.
-const PAGE_SIZE: u16 = 0x100;
-
-/// If the src address is on a different page to dest address.
-fn is_on_different_pages(src: u16, dest: u16) -> bool {
-    src / PAGE_SIZE != dest / PAGE_SIZE
-}
 
 pub struct Branch {
     branch_type: BranchType,
