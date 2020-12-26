@@ -188,20 +188,82 @@ impl Stack {
             .iter()
             .map(|&x| {
                 memory[self.stack_pointer] = x;
-                self.stack_pointer += 1;
+                self.stack_pointer -= 1;
             })
             .last();
     }
 
     pub fn pop_addr(&mut self, memory: &mut AddressSpace) -> (u8, u8) {
-        let pcl = memory[self.stack_pointer - 1];
-        memory[self.stack_pointer - 1] = 0;
+        let pcl = memory[self.stack_pointer + 1];
+        memory[self.stack_pointer + 1] = 0;
 
-        let pch = memory[self.stack_pointer - 2];
-        memory[self.stack_pointer - 2] = 0;
+        let pch = memory[self.stack_pointer + 2];
+        memory[self.stack_pointer + 2] = 0;
 
-        self.stack_pointer -= 2;
+        self.stack_pointer += 2;
 
         (pch, pcl)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ines;
+    use anyhow::Result;
+    use std::fs::File;
+    use std::io::prelude::*;
+    use std::io::BufReader;
+
+    const LOG_FILENAME: &str = "test/nestest.log";
+    const WORKING_UP_TO_LINE: u32 = 69;
+
+    #[test]
+    fn test_until_fail() -> Result<()> {
+        let nes_file = ines::NesFile::new("test/nestest.nes".to_string())?;
+        let mut cpu = Cpu::new(nes_file);
+        let f = File::open(LOG_FILENAME)?;
+        let f = BufReader::new(f);
+
+        let mut counter = 1u32;
+
+        for line in f.lines() {
+            let line = line.unwrap();
+            let operation = opcode::next(&cpu);
+
+            let operation_output = format!("{:04X}  {}", cpu.program_counter, operation.dump(&cpu));
+            if !line.contains(&operation_output) {
+                println!("Expected output: {}", line);
+                println!("Received output: {}", operation_output);
+                panic!("Mismatch in operation state.");
+            }
+
+            let cpu_state_output = format!(
+                "A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+                cpu.a,
+                cpu.x,
+                cpu.y,
+                u8::from(&cpu.status),
+                cpu.stack.into_stack_offset(),
+            );
+
+            let cyc = format!("CYC:{}", cpu.cycles);
+
+            if !line.contains(&cpu_state_output) || !line.contains(&cyc) {
+                println!("Expected output: {}", line);
+                println!("Received output: {} __ {}", cpu_state_output, cyc);
+                panic!("Mismatch in cpu state.");
+            }
+
+            operation.execute(&mut cpu);
+
+            counter += 1;
+
+            // Don't test further than this line.
+            if counter == WORKING_UP_TO_LINE {
+                break;
+            }
+        }
+        Ok(())
     }
 }

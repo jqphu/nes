@@ -89,7 +89,7 @@ impl Operation for Jmp {
         };
 
         format!(
-            "{:02X} {:02X} {:02X}  JMP  {}",
+            "{:02X} {:02X} {:02X}  JMP {}",
             self.opcode_raw,
             addr_to_bytes(self.addr).0,
             addr_to_bytes(self.addr).1,
@@ -181,7 +181,7 @@ impl Operation for Ldx {
         };
 
         format!(
-            "{:02X} {:02X}     LDX  {}",
+            "{:02X} {:02X}     LDX {}",
             self.opcode_raw, self.value, addr_string
         )
     }
@@ -235,7 +235,7 @@ impl Operation for Lda {
         };
 
         format!(
-            "{:02X} {:02X}     LDA  {}",
+            "{:02X} {:02X}     LDA {}",
             self.opcode_raw, self.value, addr_string
         )
     }
@@ -285,7 +285,7 @@ impl Operation for Stx {
         };
 
         format!(
-            "{:02X} {:02X}     STX  {}",
+            "{:02X} {:02X}     STX {}",
             self.opcode_raw, self.zero_page_addr, addr_string
         )
     }
@@ -338,7 +338,7 @@ impl Operation for Sta {
         };
 
         format!(
-            "{:02X} {:02X}     STA  {}",
+            "{:02X} {:02X}     STA {}",
             self.opcode_raw, self.zero_page_addr, addr_string
         )
     }
@@ -379,7 +379,7 @@ impl Operation for Jsr {
         let addr_string = format!("${:X}", self.addr);
 
         format!(
-            "{:02X} {:02X} {:02X}  JSR  {}",
+            "{:02X} {:02X} {:02X}  JSR {}",
             Self::OPCODE,
             addr_to_bytes(self.addr).0,
             addr_to_bytes(self.addr).1,
@@ -415,7 +415,7 @@ impl Operation for Rts {
     }
 
     fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        RTS      ", Self::OPCODE)
+        format!("{:02X}        RTS     ", Self::OPCODE)
     }
 }
 
@@ -436,7 +436,7 @@ impl Operation for Nop {
     }
 
     fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        NOP      ", Self::OPCODE)
+        format!("{:02X}        NOP     ", Self::OPCODE)
     }
 }
 
@@ -461,7 +461,7 @@ impl Operation for Sec {
     }
 
     fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        SEC      ", Self::OPCODE)
+        format!("{:02X}        SEC     ", Self::OPCODE)
     }
 }
 
@@ -496,7 +496,7 @@ impl Operation for Bcs {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BCS  ${:04X}   ",
+            "{:02X} {:02X}     BCS ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -534,7 +534,7 @@ impl Operation for Bcc {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BCC  ${:04X}   ",
+            "{:02X} {:02X}     BCC ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -572,7 +572,7 @@ impl Operation for Bvs {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BVS  ${:04X}   ",
+            "{:02X} {:02X}     BVS ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -610,7 +610,7 @@ impl Operation for Bvc {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BVC  ${:04X}   ",
+            "{:02X} {:02X}     BVC ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -648,7 +648,7 @@ impl Operation for Beq {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BEQ  ${:04X}   ",
+            "{:02X} {:02X}     BEQ ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -686,7 +686,7 @@ impl Operation for Bne {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BNE  ${:04X}   ",
+            "{:02X} {:02X}     BNE ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -724,7 +724,7 @@ impl Operation for Bpl {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BPL  ${:04X}   ",
+            "{:02X} {:02X}     BPL ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
@@ -763,7 +763,7 @@ impl Operation for Bit {
 
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     BIT  ${:02X} = {:02X}   ",
+            "{:02X} {:02X}     BIT ${:02X} = {:02X}   ",
             Self::OPCODE,
             self.zero_page_addr,
             self.zero_page_addr,
@@ -793,6 +793,6 @@ impl Operation for Clc {
     }
 
     fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        Clc      ", Self::OPCODE)
+        format!("{:02X}        CLC     ", Self::OPCODE)
     }
 }
