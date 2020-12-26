@@ -15,12 +15,14 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
     let opcode_raw = cpu.memory[pc];
 
     match opcode_raw {
+        Nop::OPCODE => Box::new(Nop::new()),
         0x4C | 0x6C => Box::new(Jmp::new(opcode_raw, cpu)),
+        Jsr::OPCODE => Box::new(Jsr::new(cpu)),
         0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
         0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode_raw, cpu)),
-        Jsr::OPCODE => Box::new(Jsr::new(cpu)),
-        Nop::OPCODE => Box::new(Nop::new()),
         Sec::OPCODE => Box::new(Sec::new()),
+        Clc::OPCODE => Box::new(Clc::new()),
+        Bcs::OPCODE => Box::new(Bcs::new(cpu)),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
@@ -309,5 +311,66 @@ impl Operation for Sec {
 
     fn dump(&self, _cpu: &Cpu) -> String {
         format!("{:02X}        SEC      ", Self::OPCODE)
+    }
+}
+
+/// Branch if carry flag set.
+struct Bcs {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bcs {
+    const OPCODE: u8 = 0xB0;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bcs { relative_value }
+    }
+}
+
+impl Operation for Bcs {
+    fn execute(&self, cpu: &mut Cpu) {
+        // TODO: Move the constant to a associated constant similar to the OPCODE.
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if !cpu.status.carry {
+            return;
+        }
+
+        cpu.program_counter += self.relative_value as u16;
+        // TODO: Add cycles if it is a new page?
+        cpu.cycles += 1;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        BCS      ", Self::OPCODE)
+    }
+}
+
+/// Clear carry flag.
+struct Clc {}
+
+impl Clc {
+    const OPCODE: u8 = 0x18;
+
+    pub fn new() -> Self {
+        Clc {}
+    }
+}
+
+impl Operation for Clc {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 1;
+
+        cpu.status.carry = false;
+
+        cpu.cycles += 2;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        Clc      ", Self::OPCODE)
     }
 }
