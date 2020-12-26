@@ -193,7 +193,15 @@ impl Stack {
             .last();
     }
 
-    pub fn _pop(&mut self, _memory: &mut AddressSpace) -> u8 {
-        panic!("Unimplemented.");
+    pub fn pop_addr(&mut self, memory: &mut AddressSpace) -> (u8, u8) {
+        let pcl = memory[self.stack_pointer - 1];
+        memory[self.stack_pointer - 1] = 0;
+
+        let pch = memory[self.stack_pointer - 2];
+        memory[self.stack_pointer - 2] = 0;
+
+        self.stack_pointer -= 2;
+
+        (pch, pcl)
     }
 }

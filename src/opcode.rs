@@ -1,5 +1,6 @@
 /// This file contains the OpCodes and their implementations.
 use crate::cpu::Cpu;
+use log::debug;
 
 pub trait Operation {
     /// Execute the opcode.
@@ -28,9 +29,13 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         Clc::OPCODE => Box::new(Clc::new()),
         Bcs::OPCODE => Box::new(Bcs::new(cpu)),
         Bcc::OPCODE => Box::new(Bcc::new(cpu)),
+        Bvs::OPCODE => Box::new(Bvs::new(cpu)),
+        Bvc::OPCODE => Box::new(Bvc::new(cpu)),
         Beq::OPCODE => Box::new(Beq::new(cpu)),
         Bne::OPCODE => Box::new(Bne::new(cpu)),
         Bit::OPCODE => Box::new(Bit::new(cpu)),
+        Bpl::OPCODE => Box::new(Bpl::new(cpu)),
+        Rts::OPCODE => Box::new(Rts::new()),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
@@ -356,12 +361,12 @@ impl Jsr {
 
 impl Operation for Jsr {
     fn execute(&self, cpu: &mut Cpu) {
-        // Jsr always 3 bytes.
-        let return_address = cpu.program_counter + 3;
+        // Jsr always 3 bytes. Push return address - 1.
+        let return_address = cpu.program_counter + 3 - 1;
 
         let (pcl, pch) = addr_to_bytes(return_address);
 
-        // Push onto the stack the return address - 1.
+        // Push onto the stack the return address.
         cpu.stack.push(&mut cpu.memory, &[pch, pcl]);
 
         cpu.program_counter = self.addr;
@@ -380,6 +385,37 @@ impl Operation for Jsr {
             addr_to_bytes(self.addr).1,
             addr_string
         )
+    }
+}
+
+struct Rts {}
+
+impl Rts {
+    const OPCODE: u8 = 0x60;
+
+    pub fn new() -> Self {
+        Rts {}
+    }
+}
+
+impl Operation for Rts {
+    fn execute(&self, cpu: &mut Cpu) {
+        let (pch, pcl) = cpu.stack.pop_addr(&mut cpu.memory);
+
+        // TODO: Fix ordering of the arguments.
+        let return_address = bytes_to_addr(pcl, pch);
+
+        cpu.program_counter = return_address;
+
+        // Add 1 for the RTS command.
+        cpu.program_counter += 1;
+
+        debug!("Returning to {:02X}", cpu.program_counter);
+        cpu.cycles += 6
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        RTS      ", Self::OPCODE)
     }
 }
 
@@ -506,6 +542,82 @@ impl Operation for Bcc {
     }
 }
 
+/// Branch if overflow set.
+struct Bvs {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bvs {
+    const OPCODE: u8 = 0x70;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bvs { relative_value }
+    }
+}
+
+impl Operation for Bvs {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if cpu.status.overflow {
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
+        }
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BVS  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
+    }
+}
+
+/// Branch if overflow clear.
+struct Bvc {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bvc {
+    const OPCODE: u8 = 0x50;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bvc { relative_value }
+    }
+}
+
+impl Operation for Bvc {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if !cpu.status.overflow {
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
+        }
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BVC  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
+    }
+}
+
 /// Branch if equal to zero.
 struct Beq {
     /// Relative value to branch to.
@@ -575,6 +687,44 @@ impl Operation for Bne {
     fn dump(&self, cpu: &Cpu) -> String {
         format!(
             "{:02X} {:02X}     BNE  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
+    }
+}
+
+/// Branch if positive.
+struct Bpl {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bpl {
+    const OPCODE: u8 = 0x10;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bpl { relative_value }
+    }
+}
+
+impl Operation for Bpl {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if !cpu.status.negative {
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
+        }
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BPL  ${:04X}   ",
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
