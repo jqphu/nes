@@ -4,12 +4,14 @@ mod flag;
 mod load;
 mod store;
 mod opcode;
+mod jump;
 
 pub use branch::*;
 pub use flag::*;
 pub use load::*;
 pub use store::*;
 pub use opcode::*;
+pub use jump::*;
 
 /// Each page is 256 bytes.
 const PAGE_SIZE: u16 = 0x100;

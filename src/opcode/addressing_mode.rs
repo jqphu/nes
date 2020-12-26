@@ -109,7 +109,7 @@ impl AddressMode {
                 register: _,
                 address: _,
             } => {
-                format!("${:04X} = {:02X}", addr as u8, value)
+                format!("${:04X}", addr)
             }
             _ => panic!("Unsupported!"),
         }
@@ -136,7 +136,7 @@ impl AddressMode {
                 address,
             } => {
                 format!(
-                    "${:02X} ${:02X}",
+                    "{:02X} {:02X}",
                     addr_to_bytes(*address).0,
                     addr_to_bytes(*address).1
                 )

@@ -5,7 +5,7 @@
 use log::info;
 use std::convert::From;
 
-use crate::opcode;
+use crate::opcode::{self, *};
 
 const MEMORY_SIZE_MAX: usize = 0xffff + 1;
 pub type AddressSpace = [u8; MEMORY_SIZE_MAX];
@@ -183,26 +183,35 @@ impl Stack {
         (self.stack_pointer - 0x1000) as u8
     }
 
-    pub fn push(&mut self, memory: &mut AddressSpace, value: &[u8]) {
+    pub fn push_addr(&mut self, memory: &mut AddressSpace, addr: u16) {
+        let (pcl, pch) = addr_to_bytes(addr);
+
+        memory[self.stack_pointer] = pch;
+        memory[self.stack_pointer - 1] = pcl;
+
+        self.stack_pointer -= 2;
+    }
+
+    pub fn push(&mut self, memory: &mut AddressSpace, value: u8) {
+        memory[self.stack_pointer] = value;
+        self.stack_pointer -= 1;
+    }
+
+    pub fn pop(&mut self, memory: &mut AddressSpace) -> u8 {
+        let value = memory[self.stack_pointer + 1];
+
+        self.stack_pointer += 1;
+
         value
-            .iter()
-            .map(|&x| {
-                memory[self.stack_pointer] = x;
-                self.stack_pointer -= 1;
-            })
-            .last();
     }
 
     pub fn pop_addr(&mut self, memory: &mut AddressSpace) -> (u8, u8) {
         let pcl = memory[self.stack_pointer + 1];
-        memory[self.stack_pointer + 1] = 0;
-
         let pch = memory[self.stack_pointer + 2];
-        memory[self.stack_pointer + 2] = 0;
 
         self.stack_pointer += 2;
 
-        (pch, pcl)
+        (pcl, pch)
     }
 }
 
