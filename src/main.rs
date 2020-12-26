@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::Clap;
-use env_logger;
 use log::info;
 
 mod cpu;

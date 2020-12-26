@@ -30,11 +30,7 @@ impl Header {
 
     /// Construct a header struct from the raw 16 header bytes.
     fn new(header: [u8; Self::HEADER_SIZE_BYTES]) -> Result<Self> {
-        if header[0] != 'N' as u8
-            || header[1] != 'E' as u8
-            || header[2] != 'S' as u8
-            || header[3] != 0x1A
-        {
+        if header[0] != b'N' || header[1] != b'E' || header[2] != b'S' || header[3] != 0x1A {
             return Err(anyhow!("Invalid file magic {:?}.", header));
         }
 

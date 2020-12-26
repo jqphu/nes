@@ -89,7 +89,7 @@ impl Cpu {
                 self.x,
                 self.y,
                 u8::from(&self.status),
-                self.stack.into_stack_offset(),
+                self.stack.as_stack_offset(),
                 self.cycles
             );
 
@@ -179,7 +179,7 @@ impl Stack {
     }
 
     /// Returns the expected value in cpu register which is an offset to $1000.
-    fn into_stack_offset(&self) -> u8 {
+    fn as_stack_offset(&self) -> u8 {
         (self.stack_pointer - 0x1000) as u8
     }
 
@@ -244,7 +244,7 @@ mod tests {
                 cpu.x,
                 cpu.y,
                 u8::from(&cpu.status),
-                cpu.stack.into_stack_offset(),
+                cpu.stack.as_stack_offset(),
             );
 
             let cyc = format!("CYC:{}", cpu.cycles);
