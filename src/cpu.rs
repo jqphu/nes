@@ -7,6 +7,9 @@ use std::convert::From;
 
 use crate::opcode;
 
+const MEMORY_SIZE_MAX: usize = 0xffff + 1;
+pub type AddressSpace = [u8; MEMORY_SIZE_MAX];
+
 /// State of the CPU.
 ///
 /// For simplicity, we store the bank fixed to the CPU for now. As we build to a more advanced
@@ -19,10 +22,8 @@ pub struct Cpu {
     /// Low 8-bit is PCL, higher 8-bit is PCH.
     pub program_counter: u16,
 
-    /// Stack pointer.
-    ///
-    /// Offset from the stack page. I.e. 0x1000 + stack_pointer is currently the top of the stack.
-    stack_pointer: u8,
+    /// Stack.
+    pub stack: Stack,
 
     /// Processor Status.
     ///
@@ -41,14 +42,12 @@ pub struct Cpu {
     /// Memory.
     ///
     /// Limited to NROM thus only has 64 kibibytes.
-    pub memory: [u8; Cpu::MEMORY_SIZE_MAX],
+    pub memory: AddressSpace,
 
     pub cycles: u64,
 }
 
 impl Cpu {
-    const MEMORY_SIZE_MAX: usize = 0xffff + 1;
-
     const FIRST_16_KB_OF_ROM: usize = 0x8000;
     const LAST_16_KB_OF_ROM: usize = 0xC000;
 
@@ -62,12 +61,12 @@ impl Cpu {
         let mut cpu = Cpu {
             // Hard coded to start at ROM.
             program_counter: 0xc000,
-            stack_pointer: 0xfd,
+            stack: Stack::new(),
             status: ProcessorStatus::new(),
             accumulator: 0,
             x: 0,
             y: 0,
-            memory: [0; Cpu::MEMORY_SIZE_MAX],
+            memory: [0; MEMORY_SIZE_MAX],
             cycles: 7,
         };
 
@@ -90,7 +89,7 @@ impl Cpu {
                 self.x,
                 self.y,
                 u8::from(&self.status),
-                self.stack_pointer,
+                self.stack.into_stack_offset(),
                 self.cycles
             );
 
@@ -103,22 +102,22 @@ impl Cpu {
 /// TODO: Expand this.
 pub struct ProcessorStatus {
     /// Carry (C) Flag
-    carry: bool,
+    pub carry: bool,
 
     /// Zero (Z) Flag
-    zero: bool,
+    pub zero: bool,
 
     /// Interrupt Disable (I) Flag
-    interrupt_disable: bool,
+    pub interrupt_disable: bool,
 
     /// Overflow Flag
-    overflow: bool,
+    pub overflow: bool,
 
     /// Bit 4, not used by CPU.
-    b_flag: bool,
+    pub b_flag: bool,
 
     /// Negative flag.
-    negative: bool,
+    pub negative: bool,
     // Decimal flag not used on NES.
 }
 
@@ -162,5 +161,38 @@ impl From<&ProcessorStatus> for u8 {
             | b_flag_upper << 5
             | (src.overflow as u8) << 6
             | (src.negative as u8) << 7
+    }
+}
+
+/// Stack starts at 0x1000.
+pub struct Stack {
+    // Address of the next free element in the stack (absolute address).
+    stack_pointer: usize,
+}
+
+impl Stack {
+    fn new() -> Self {
+        Stack {
+            stack_pointer: 0x1000 + 0xFD,
+        }
+    }
+
+    /// Returns the expected value in cpu register which is an offset to $1000.
+    fn into_stack_offset(&self) -> u8 {
+        (self.stack_pointer - 0x1000) as u8
+    }
+
+    pub fn push(&mut self, memory: &mut AddressSpace, value: &[u8]) {
+        value
+            .iter()
+            .map(|&x| {
+                memory[self.stack_pointer] = x;
+                self.stack_pointer += 1;
+            })
+            .last();
+    }
+
+    pub fn _pop(&mut self, _memory: &mut AddressSpace) -> u8 {
+        panic!("Unimplemented.");
     }
 }

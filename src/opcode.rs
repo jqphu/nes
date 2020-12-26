@@ -18,6 +18,9 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         0x4C | 0x6C => Box::new(Jmp::new(opcode_raw, cpu)),
         0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
         0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode_raw, cpu)),
+        Jsr::OPCODE => Box::new(Jsr::new(cpu)),
+        Nop::OPCODE => Box::new(Nop::new()),
+        Sec::OPCODE => Box::new(Sec::new()),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
@@ -73,17 +76,27 @@ impl Operation for Jmp {
         format!(
             "{:02X} {:02X} {:02X}  JMP  {}",
             self.opcode_raw,
-            self.addr_to_bytes().0,
-            self.addr_to_bytes().1,
+            addr_to_bytes(self.addr).0,
+            addr_to_bytes(self.addr).1,
             addr_string
         )
     }
+}
+/// Assuming little endian, merge the two u8 values into a u16 value.
+/// For some reason, the orders are reversed?
+/// TODO: Figure out Why?
+fn bytes_to_addr(first: u8, second: u8) -> u16 {
+    ((second as u16) << 8) | first as u16
+}
+
+fn addr_to_bytes(addr: u16) -> (u8, u8) {
+    (addr as u8, (addr >> 8) as u8)
 }
 
 impl Jmp {
     pub fn new(opcode_raw: u8, cpu: &Cpu) -> Self {
         let pc = cpu.program_counter as usize;
-        let addr = Jmp::bytes_to_addr(cpu.memory[pc + 1], cpu.memory[pc + 2]);
+        let addr = bytes_to_addr(cpu.memory[pc + 1], cpu.memory[pc + 2]);
         match opcode_raw {
             // Absolute
             0x4C => Jmp {
@@ -101,16 +114,6 @@ impl Jmp {
             },
             _ => panic!("Unexpected opcode"),
         }
-    }
-    /// Assuming little endian, merge the two u8 values into a u16 value.
-    /// For some reason, the orders are reversed?
-    /// TODO: Figure out Why?
-    fn bytes_to_addr(first: u8, second: u8) -> u16 {
-        ((second as u16) << 8) | first as u16
-    }
-
-    fn addr_to_bytes(&self) -> (u8, u8) {
-        (self.addr as u8, (self.addr >> 8) as u8)
     }
 }
 
@@ -216,5 +219,95 @@ impl Operation for Stx {
             "{:02X} {:02X}     STX  {}",
             self.opcode_raw, self.zero_page_addr, addr_string
         )
+    }
+}
+
+struct Jsr {
+    /// Address to jump to.
+    addr: u16,
+}
+
+impl Jsr {
+    const OPCODE: u8 = 0x20;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let pc = cpu.program_counter as usize;
+        let addr = bytes_to_addr(cpu.memory[pc + 1], cpu.memory[pc + 2]);
+        Jsr { addr }
+    }
+}
+
+impl Operation for Jsr {
+    fn execute(&self, cpu: &mut Cpu) {
+        // Jsr always 3 bytes.
+        let return_address = cpu.program_counter + 3;
+
+        let (pcl, pch) = addr_to_bytes(return_address);
+
+        // Push onto the stack the return address - 1.
+        cpu.stack.push(&mut cpu.memory, &[pch, pcl]);
+
+        cpu.program_counter = self.addr;
+
+        // Always 6 cycles for a JSR
+        cpu.cycles += 6;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        let addr_string = format!("${:X}", self.addr);
+
+        format!(
+            "{:02X} {:02X} {:02X}  JSR  {}",
+            Self::OPCODE,
+            addr_to_bytes(self.addr).0,
+            addr_to_bytes(self.addr).1,
+            addr_string
+        )
+    }
+}
+
+struct Nop {}
+
+impl Nop {
+    const OPCODE: u8 = 0xea;
+
+    pub fn new() -> Self {
+        Nop {}
+    }
+}
+
+impl Operation for Nop {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 1;
+        cpu.cycles += 2;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        NOP      ", Self::OPCODE)
+    }
+}
+
+/// Set carry flag.
+struct Sec {}
+
+impl Sec {
+    const OPCODE: u8 = 0x38;
+
+    pub fn new() -> Self {
+        Sec {}
+    }
+}
+
+impl Operation for Sec {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 1;
+
+        cpu.status.carry = true;
+
+        cpu.cycles += 2;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        SEC      ", Self::OPCODE)
     }
 }
