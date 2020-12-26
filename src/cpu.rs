@@ -118,7 +118,9 @@ pub struct ProcessorStatus {
 
     /// Negative flag.
     pub negative: bool,
-    // Decimal flag not used on NES.
+
+    /// Decimal flag. Should not ever be used in nes.
+    pub decimal: bool,
 }
 
 impl ProcessorStatus {
@@ -132,6 +134,7 @@ impl ProcessorStatus {
             interrupt_disable: true,
             overflow: false,
             negative: false,
+            decimal: false,
         }
     }
 
@@ -148,16 +151,13 @@ impl ProcessorStatus {
 
 impl From<&ProcessorStatus> for u8 {
     fn from(src: &ProcessorStatus) -> u8 {
-        // Decimal is not used in NES.
-        let decimal = 0u8;
-
         // Upper bit of b flag (bit 5 of status) is always 1.
         let b_flag_upper = 1u8;
 
         (src.carry as u8)
             | (src.zero as u8) << 1
             | (src.interrupt_disable as u8) << 2
-            | decimal << 3
+            | (src.decimal as u8) << 3
             | (src.b_flag as u8) << 4
             | b_flag_upper << 5
             | (src.overflow as u8) << 6

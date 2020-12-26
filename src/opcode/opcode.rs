@@ -20,6 +20,10 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         return Box::new(branch);
     }
 
+    if let Some(flag) = Flag::new(opcode) {
+        return Box::new(flag);
+    }
+
     match opcode {
         Nop::OPCODE => Box::new(Nop::new()),
         0x4C | 0x6C => Box::new(Jmp::new(opcode, cpu)),
@@ -28,8 +32,6 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode, cpu)),
         0x85 => Box::new(Sta::new(opcode, cpu)),
         0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => Box::new(Lda::new(opcode, cpu)),
-        Sec::OPCODE => Box::new(Sec::new()),
-        Clc::OPCODE => Box::new(Clc::new()),
         Bit::OPCODE => Box::new(Bit::new(cpu)),
         Rts::OPCODE => Box::new(Rts::new()),
         _ => panic!("Unsupported {:X}", opcode),
@@ -436,31 +438,6 @@ impl Operation for Nop {
     }
 }
 
-/// Set carry flag.
-struct Sec {}
-
-impl Sec {
-    const OPCODE: u8 = 0x38;
-
-    pub fn new() -> Self {
-        Sec {}
-    }
-}
-
-impl Operation for Sec {
-    fn execute(&self, cpu: &mut Cpu) {
-        cpu.program_counter += 1;
-
-        cpu.status.carry = true;
-
-        cpu.cycles += 2;
-    }
-
-    fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        SEC     ", Self::OPCODE)
-    }
-}
-
 /// Bit test.
 ///
 /// And the memory with what is in the accumulator and set flags.
@@ -498,30 +475,5 @@ impl Operation for Bit {
             self.zero_page_addr,
             cpu.memory[self.zero_page_addr as usize]
         )
-    }
-}
-
-/// Clear carry flag.
-struct Clc {}
-
-impl Clc {
-    const OPCODE: u8 = 0x18;
-
-    pub fn new() -> Self {
-        Clc {}
-    }
-}
-
-impl Operation for Clc {
-    fn execute(&self, cpu: &mut Cpu) {
-        cpu.program_counter += 1;
-
-        cpu.status.carry = false;
-
-        cpu.cycles += 2;
-    }
-
-    fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        CLC     ", Self::OPCODE)
     }
 }
