@@ -134,7 +134,8 @@ impl Operation for Branch {
             let addr = AddressMode::Relative {
                 offset: self.offset,
             }
-            .to_addr(cpu);
+            .to_addr(cpu)
+            .unwrap();
 
             let next_instruction_addr = cpu.program_counter;
 

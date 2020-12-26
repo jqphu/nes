@@ -82,7 +82,7 @@ impl Cpu {
         loop {
             let operation = opcode::next(self);
             info!(
-                "{:X}  {} \t A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP: {:02X} CYC: {}",
+                "{:X}  {}  \tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP: {:02X} CYC: {}",
                 self.program_counter,
                 &operation.dump(self),
                 self.a,

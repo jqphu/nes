@@ -1,5 +1,6 @@
 /// This file contains the OpCodes and their implementations.
 use crate::cpu::Cpu;
+use crate::opcode::addressing_mode::*;
 use crate::opcode::*;
 use log::debug;
 
@@ -95,16 +96,6 @@ impl Operation for Jmp {
         )
     }
 }
-/// Assuming little endian, merge the two u8 values into a u16 value.
-/// For some reason, the orders are reversed?
-/// TODO: Figure out Why?
-fn bytes_to_addr(first: u8, second: u8) -> u16 {
-    ((second as u16) << 8) | first as u16
-}
-
-fn addr_to_bytes(addr: u16) -> (u8, u8) {
-    (addr as u8, (addr >> 8) as u8)
-}
 
 impl Jmp {
     pub fn new(opcode_raw: u8, cpu: &Cpu) -> Self {
@@ -136,11 +127,11 @@ struct Ldx {
     /// Only Absolute and Indirect are valid modes.
     mode: AddressingMode,
 
+    /// Type of addressing mode.
+    mode_new: AddressMode,
+
     /// Number of cycles this operation takes.
     cycles: u8,
-
-    /// Value to load.
-    value: u8,
 }
 
 /// TODO: Generalize addressing mode to a separate module.
@@ -153,8 +144,8 @@ impl Ldx {
             0xA2 => Ldx {
                 opcode_raw,
                 mode: AddressingMode::Immediate,
+                mode_new: AddressMode::Immediate { value },
                 cycles: 2,
-                value,
             },
             _ => panic!("Unsupported {}", opcode_raw),
         }
@@ -166,21 +157,17 @@ impl Operation for Ldx {
     fn execute(&self, cpu: &mut Cpu) {
         cpu.program_counter += self.mode.get_bytes() as u16;
         cpu.cycles += u64::from(self.cycles);
-        cpu.x = self.value;
+        cpu.x = self.mode_new.to_value(cpu);
 
         cpu.status.update_load(cpu.x);
     }
 
-    fn dump(&self, _cpu: &Cpu) -> String {
-        let addr_string = match self.mode {
-            AddressingMode::Immediate => format!("#${:02X}", self.value),
-            AddressingMode::Absolute => format!("${:02X}", self.value),
-            _ => panic!("Unsupproted!"),
-        };
-
+    fn dump(&self, cpu: &Cpu) -> String {
         format!(
-            "{:02X} {:02X}     LDX {}",
-            self.opcode_raw, self.value, addr_string
+            "{:02X} {}     LDX {}",
+            self.opcode_raw,
+            self.mode_new.value_to_string(),
+            self.mode_new.to_string(cpu)
         )
     }
 }
