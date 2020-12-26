@@ -37,7 +37,7 @@ pub struct Cpu {
     pub x: u8,
 
     /// Index register Y.
-    y: u8,
+    pub y: u8,
 
     /// Memory.
     ///

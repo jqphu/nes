@@ -1,4 +1,5 @@
 use crate::cpu::Cpu;
+use crate::opcode::addressing_mode::AddressMode;
 use crate::opcode::Operation;
 use std::string::ToString;
 
@@ -14,7 +15,7 @@ pub struct Branch {
     branch_type: BranchType,
 
     /// Offset to branch to on success.
-    relative_branch_offset: u8,
+    offset: i8,
 }
 
 /// The type of branch operation.
@@ -97,19 +98,19 @@ impl Branch {
 
     /// Create a new branch from an opcode.
     pub fn new(opcode: u8, cpu: &Cpu) -> Option<Self> {
-        let relative_branch_offset = cpu.memory[(cpu.program_counter + 1) as usize];
+        let offset = cpu.memory[(cpu.program_counter + 1) as usize] as i8;
 
         let branch_type = BranchType::from_opcode(opcode)?;
 
         Some(Branch {
             branch_type,
-            relative_branch_offset,
+            offset,
         })
     }
 
     /// Specalitve computation of branch value.
     fn branch_value(&self, cpu: &Cpu) -> u16 {
-        cpu.program_counter + Self::BYTE_COUNT + self.relative_branch_offset as u16
+        cpu.program_counter + Self::BYTE_COUNT + self.offset as u16
     }
 }
 
@@ -130,9 +131,14 @@ impl Operation for Branch {
         };
 
         if should_branch {
+            let addr = AddressMode::Relative {
+                offset: self.offset,
+            }
+            .to_addr(cpu);
+
             let next_instruction_addr = cpu.program_counter;
 
-            cpu.program_counter += self.relative_branch_offset as u16;
+            cpu.program_counter = addr;
 
             cpu.cycles += 1;
 
@@ -146,7 +152,7 @@ impl Operation for Branch {
         format!(
             "{:02X} {:02X}     {} ${:04X}   ",
             self.branch_type.to_opcode(),
-            self.relative_branch_offset,
+            self.offset,
             self.branch_type.to_string(),
             self.branch_value(cpu),
         )
