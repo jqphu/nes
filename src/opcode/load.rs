@@ -108,7 +108,7 @@ impl Load {
         }
     }
 
-    fn get_bytes(&self) -> u64 {
+    fn get_bytes(&self) -> u16 {
         match &self.mode {
             AddressMode::Immediate { value: _ } => 2,
             AddressMode::ZeroPage {
@@ -131,7 +131,7 @@ impl Load {
 impl Operation for Load {
     /// JMP simply moves to the address.
     fn execute(&self, cpu: &mut Cpu) {
-        cpu.program_counter += self.get_bytes() as u16;
+        cpu.program_counter += self.get_bytes();
         cpu.cycles += self.get_cycles(cpu);
         let value = self.mode.to_value(cpu);
 

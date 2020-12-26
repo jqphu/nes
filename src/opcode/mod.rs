@@ -1,17 +1,20 @@
 mod addressing_mode;
 mod branch;
 mod flag;
-mod load;
-mod store;
-mod opcode;
 mod jump;
+mod load;
+mod opcode;
+mod store;
+
+use crate::cpu::Cpu;
+use crate::opcode::addressing_mode::{AddRegister, AddressMode};
 
 pub use branch::*;
 pub use flag::*;
-pub use load::*;
-pub use store::*;
-pub use opcode::*;
 pub use jump::*;
+pub use load::*;
+pub use opcode::*;
+pub use store::*;
 
 /// Each page is 256 bytes.
 const PAGE_SIZE: u16 = 0x100;
@@ -46,5 +49,119 @@ impl ToString for Register {
             Register::Y => "Y",
         }
         .to_string()
+    }
+}
+
+struct Nop {}
+
+impl Nop {
+    const OPCODE: u8 = 0xEA;
+    const BYTES: u16 = 1;
+    const CYCLES: u64 = 2;
+
+    pub fn new(opcode: u8) -> Option<Self> {
+        if opcode != Nop::OPCODE {
+            None
+        } else {
+            Some(Nop {})
+        }
+    }
+}
+
+impl Operation for Nop {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += Self::BYTES;
+        cpu.cycles += Self::CYCLES;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        NOP     ", Self::OPCODE)
+    }
+}
+
+/// Bit test.
+///
+/// And the memory with what is in the accumulator and set flags.
+struct Bit {
+    opcode: u8,
+
+    /// Address of the memory to test.
+    mode: AddressMode,
+}
+
+impl Bit {
+    pub fn new(opcode: u8, cpu: &Cpu) -> Option<Self> {
+        let pc = cpu.program_counter as usize;
+        let value = cpu.memory[pc + 1];
+
+        match opcode {
+            0x24 => Some(Bit {
+                opcode,
+                mode: AddressMode::ZeroPage {
+                    register: AddRegister::None,
+                    offset: value,
+                },
+            }),
+            0x2C => {
+                let address = bytes_to_addr(value, cpu.memory[pc + 2]);
+                Some(Bit {
+                    opcode,
+                    mode: AddressMode::Absolute {
+                        register: AddRegister::None,
+                        address,
+                    },
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get_bytes(&self) -> u16 {
+        match &self.mode {
+            AddressMode::ZeroPage {
+                register: _,
+                offset: _,
+            } => 2,
+            AddressMode::Absolute {
+                register: _,
+                address: _,
+            } => 3,
+            _ => panic!("Unexpected!"),
+        }
+    }
+
+    pub fn get_cycles(&self) -> u64 {
+        match &self.mode {
+            AddressMode::ZeroPage {
+                register: _,
+                offset: _,
+            } => 3,
+            AddressMode::Absolute {
+                register: _,
+                address: _,
+            } => 4,
+            _ => panic!("Unexpected!"),
+        }
+    }
+}
+
+impl Operation for Bit {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += self.get_bytes();
+        cpu.cycles += self.get_cycles();
+
+        let test_value = self.mode.to_value(cpu);
+        let result = test_value & cpu.a;
+
+        cpu.status.update_bit(result);
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {}     BIT {}   ",
+            self.opcode,
+            self.mode.value_to_string(),
+            self.mode.to_string(cpu),
+        )
     }
 }
