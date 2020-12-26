@@ -14,30 +14,25 @@ pub trait Operation {
 /// Read in the next opcode and set up PC.
 pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
     let pc = cpu.program_counter as usize;
-    let opcode_raw = cpu.memory[pc];
+    let opcode = cpu.memory[pc];
 
-    match opcode_raw {
+    if let Some(branch) = Branch::new(opcode, cpu) {
+        return Box::new(branch);
+    }
+
+    match opcode {
         Nop::OPCODE => Box::new(Nop::new()),
-        0x4C | 0x6C => Box::new(Jmp::new(opcode_raw, cpu)),
+        0x4C | 0x6C => Box::new(Jmp::new(opcode, cpu)),
         Jsr::OPCODE => Box::new(Jsr::new(cpu)),
-        0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
-        0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode_raw, cpu)),
-        0x85 => Box::new(Sta::new(opcode_raw, cpu)),
-        0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => {
-            Box::new(Lda::new(opcode_raw, cpu))
-        }
+        0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode, cpu)),
+        0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode, cpu)),
+        0x85 => Box::new(Sta::new(opcode, cpu)),
+        0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => Box::new(Lda::new(opcode, cpu)),
         Sec::OPCODE => Box::new(Sec::new()),
         Clc::OPCODE => Box::new(Clc::new()),
-        Bcs::OPCODE => Box::new(Bcs::new(cpu)),
-        Bcc::OPCODE => Box::new(Bcc::new(cpu)),
-        Bvs::OPCODE => Box::new(Bvs::new(cpu)),
-        Bvc::OPCODE => Box::new(Bvc::new(cpu)),
-        Beq::OPCODE => Box::new(Beq::new(cpu)),
-        Bne::OPCODE => Box::new(Bne::new(cpu)),
         Bit::OPCODE => Box::new(Bit::new(cpu)),
-        Bpl::OPCODE => Box::new(Bpl::new(cpu)),
         Rts::OPCODE => Box::new(Rts::new()),
-        _ => panic!("Unsupported {:X}", opcode_raw),
+        _ => panic!("Unsupported {:X}", opcode),
     }
 }
 
