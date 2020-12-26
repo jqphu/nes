@@ -20,10 +20,15 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         Jsr::OPCODE => Box::new(Jsr::new(cpu)),
         0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
         0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode_raw, cpu)),
+        0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => {
+            Box::new(Lda::new(opcode_raw, cpu))
+        }
         Sec::OPCODE => Box::new(Sec::new()),
         Clc::OPCODE => Box::new(Clc::new()),
         Bcs::OPCODE => Box::new(Bcs::new(cpu)),
         Bcc::OPCODE => Box::new(Bcc::new(cpu)),
+        Beq::OPCODE => Box::new(Beq::new(cpu)),
+        Bne::OPCODE => Box::new(Bne::new(cpu)),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
@@ -170,6 +175,60 @@ impl Operation for Ldx {
 
         format!(
             "{:02X} {:02X}     LDX  {}",
+            self.opcode_raw, self.value, addr_string
+        )
+    }
+}
+
+struct Lda {
+    opcode_raw: u8,
+
+    /// Only Absolute and Indirect are valid modes.
+    mode: AddressingMode,
+
+    /// Number of cycles this operation takes.
+    cycles: u8,
+
+    /// Value to load.
+    value: u8,
+}
+
+/// TODO: Generalize addressing mode to a separate module.
+impl Lda {
+    pub fn new(opcode_raw: u8, cpu: &Cpu) -> Self {
+        let pc = cpu.program_counter as usize;
+        let value = cpu.memory[pc + 1];
+        match opcode_raw {
+            // Immediate.
+            0xA9 => Lda {
+                opcode_raw,
+                mode: AddressingMode::Immediate,
+                cycles: 2,
+                value,
+            },
+            _ => panic!("Unsupported {}", opcode_raw),
+        }
+    }
+}
+
+impl Operation for Lda {
+    /// JMP simply moves to the address.
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += self.mode.get_bytes() as u16;
+        cpu.accumulator = self.value;
+
+        cpu.cycles += u64::from(self.cycles);
+        cpu.status.update(cpu.accumulator);
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        let addr_string = match self.mode {
+            AddressingMode::Immediate => format!("#${:02X}", self.value),
+            _ => panic!("Unsupproted!"),
+        };
+
+        format!(
+            "{:02X} {:02X}     LDA  {}",
             self.opcode_raw, self.value, addr_string
         )
     }
@@ -337,17 +396,20 @@ impl Operation for Bcs {
         cpu.program_counter += 2;
         cpu.cycles += 2;
 
-        if !cpu.status.carry {
-            return;
+        if cpu.status.carry {
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
         }
-
-        cpu.program_counter += self.relative_value as u16;
-        // TODO: Add cycles if it is a new page?
-        cpu.cycles += 1;
     }
 
-    fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        BCS      ", Self::OPCODE)
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BCS  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
     }
 }
 
@@ -372,17 +434,20 @@ impl Operation for Bcc {
         cpu.program_counter += 2;
         cpu.cycles += 2;
 
-        if cpu.status.carry {
-            return;
+        if !cpu.status.carry {
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
         }
-
-        cpu.program_counter += self.relative_value as u16;
-        // TODO: Add cycles if it is a new page?
-        cpu.cycles += 1;
     }
 
-    fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        BCC      ", Self::OPCODE)
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BCC  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
     }
 }
 
@@ -392,32 +457,73 @@ struct Beq {
     relative_value: u8,
 }
 
-impl Bcc {
-    const OPCODE: u8 = 0xFO;
+impl Beq {
+    const OPCODE: u8 = 0xF0;
 
     pub fn new(cpu: &Cpu) -> Self {
         let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
 
-        Bcc { relative_value }
+        Beq { relative_value }
     }
 }
 
-impl Operation for Bec {
+impl Operation for Beq {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if cpu.status.zero {
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
+        }
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BEQ  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
+    }
+}
+
+/// Branch if equal to zero.
+struct Bne {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bne {
+    const OPCODE: u8 = 0xD0;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bne { relative_value }
+    }
+}
+
+impl Operation for Bne {
     fn execute(&self, cpu: &mut Cpu) {
         cpu.program_counter += 2;
         cpu.cycles += 2;
 
         if !cpu.status.zero {
-            return;
+            cpu.program_counter += self.relative_value as u16;
+            // TODO: Add cycles if it is a new page?
+            cpu.cycles += 1;
         }
-
-        cpu.program_counter += self.relative_value as u16;
-        // TODO: Add cycles if it is a new page?
-        cpu.cycles += 1;
     }
 
-    fn dump(&self, _cpu: &Cpu) -> String {
-        format!("{:02X}        BEC      ", Self::OPCODE)
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BNE  ${:04X}   ",
+            Self::OPCODE,
+            self.relative_value,
+            cpu.program_counter + self.relative_value as u16 + 2
+        )
     }
 }
 

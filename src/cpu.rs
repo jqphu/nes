@@ -31,7 +31,7 @@ pub struct Cpu {
     pub status: ProcessorStatus,
 
     /// Accumulator.
-    accumulator: u8,
+    pub accumulator: u8,
 
     /// Index register X.
     pub x: u8,
@@ -134,14 +134,9 @@ impl ProcessorStatus {
     }
 
     pub fn update(&mut self, value: u8) {
-        if value == 0 {
-            self.zero = true;
-        }
-
+        self.zero = value == 0;
         // Bit 7 is set
-        if (value & 0b10000000) == 1 {
-            self.negative = true;
-        }
+        self.negative = value & 0b10000000 == 1;
     }
 }
 
