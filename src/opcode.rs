@@ -23,6 +23,7 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         Sec::OPCODE => Box::new(Sec::new()),
         Clc::OPCODE => Box::new(Clc::new()),
         Bcs::OPCODE => Box::new(Bcs::new(cpu)),
+        Bcc::OPCODE => Box::new(Bcc::new(cpu)),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
@@ -347,6 +348,76 @@ impl Operation for Bcs {
 
     fn dump(&self, _cpu: &Cpu) -> String {
         format!("{:02X}        BCS      ", Self::OPCODE)
+    }
+}
+
+/// Branch if carry flag clear.
+struct Bcc {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bcc {
+    const OPCODE: u8 = 0x90;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bcc { relative_value }
+    }
+}
+
+impl Operation for Bcc {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if cpu.status.carry {
+            return;
+        }
+
+        cpu.program_counter += self.relative_value as u16;
+        // TODO: Add cycles if it is a new page?
+        cpu.cycles += 1;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        BCC      ", Self::OPCODE)
+    }
+}
+
+/// Branch if equal to zero.
+struct Beq {
+    /// Relative value to branch to.
+    relative_value: u8,
+}
+
+impl Bcc {
+    const OPCODE: u8 = 0xFO;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let relative_value = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bcc { relative_value }
+    }
+}
+
+impl Operation for Bec {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 2;
+
+        if !cpu.status.zero {
+            return;
+        }
+
+        cpu.program_counter += self.relative_value as u16;
+        // TODO: Add cycles if it is a new page?
+        cpu.cycles += 1;
+    }
+
+    fn dump(&self, _cpu: &Cpu) -> String {
+        format!("{:02X}        BEC      ", Self::OPCODE)
     }
 }
 
