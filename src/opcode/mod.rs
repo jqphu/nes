@@ -3,6 +3,7 @@ mod branch;
 mod flag;
 mod jump;
 mod load;
+mod push_pull;
 mod store;
 
 use crate::cpu::Cpu;
@@ -12,6 +13,7 @@ pub use branch::*;
 pub use flag::*;
 pub use jump::*;
 pub use load::*;
+pub use push_pull::*;
 pub use store::*;
 
 pub trait Operation {
@@ -61,6 +63,14 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
 
     if let Some(bit) = Bit::new(opcode, cpu) {
         return Box::new(bit);
+    }
+
+    if let Some(push) = Push::new(opcode) {
+        return Box::new(push);
+    }
+
+    if let Some(pull) = Pull::new(opcode) {
+        return Box::new(pull);
     }
 
     panic!("Unexpected opcode {:02X}", opcode);

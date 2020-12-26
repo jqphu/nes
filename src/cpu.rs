@@ -88,7 +88,7 @@ impl Cpu {
                 self.a,
                 self.x,
                 self.y,
-                u8::from(&self.status),
+                u8::from(self.status.clone()),
                 self.stack.as_stack_offset(),
                 self.cycles
             );
@@ -100,6 +100,7 @@ impl Cpu {
 
 /// A 8 bit register that has the processor state.
 /// TODO: Expand this.
+#[derive(Clone)]
 pub struct ProcessorStatus {
     /// Carry (C) Flag
     pub carry: bool,
@@ -124,8 +125,14 @@ pub struct ProcessorStatus {
 }
 
 impl ProcessorStatus {
-    const NEGATIVE_MASK: u8 = 0b1000_0000;
-    const OVERFLOW_MASK: u8 = 0b0100_0000;
+    pub const CARRY_MASK: u8 = 0b0000_0001;
+    pub const ZERO_MASK: u8 = 0b0000_0010;
+    pub const INTERRUPT_DISABLE_MASK: u8 = 0b0000_0100;
+    pub const DECIMAL_MASK: u8 = 0b0000_1000;
+    pub const B_FLAG_MASK: u8 = 0b0010_0000;
+    pub const OVERFLOW_MASK: u8 = 0b0100_0000;
+    pub const NEGATIVE_MASK: u8 = 0b1000_0000;
+
     fn new() -> Self {
         ProcessorStatus {
             carry: false,
@@ -149,8 +156,8 @@ impl ProcessorStatus {
     }
 }
 
-impl From<&ProcessorStatus> for u8 {
-    fn from(src: &ProcessorStatus) -> u8 {
+impl From<ProcessorStatus> for u8 {
+    fn from(src: ProcessorStatus) -> u8 {
         // Upper bit of b flag (bit 5 of status) is always 1.
         let b_flag_upper = 1u8;
 
@@ -162,6 +169,21 @@ impl From<&ProcessorStatus> for u8 {
             | b_flag_upper << 5
             | (src.overflow as u8) << 6
             | (src.negative as u8) << 7
+    }
+}
+
+impl From<u8> for ProcessorStatus {
+    fn from(src: u8) -> ProcessorStatus {
+        ProcessorStatus {
+            carry: src & ProcessorStatus::CARRY_MASK == ProcessorStatus::CARRY_MASK,
+            zero: src & ProcessorStatus::ZERO_MASK == ProcessorStatus::ZERO_MASK,
+            interrupt_disable: src & ProcessorStatus::INTERRUPT_DISABLE_MASK
+                == ProcessorStatus::INTERRUPT_DISABLE_MASK,
+            decimal: src & ProcessorStatus::DECIMAL_MASK == ProcessorStatus::DECIMAL_MASK,
+            b_flag: src & ProcessorStatus::B_FLAG_MASK == ProcessorStatus::B_FLAG_MASK,
+            overflow: src & ProcessorStatus::OVERFLOW_MASK == ProcessorStatus::OVERFLOW_MASK,
+            negative: src & ProcessorStatus::NEGATIVE_MASK == ProcessorStatus::NEGATIVE_MASK,
+        }
     }
 }
 
@@ -192,12 +214,12 @@ impl Stack {
         self.stack_pointer -= 2;
     }
 
-    pub fn _push(&mut self, memory: &mut AddressSpace, value: u8) {
+    pub fn push(&mut self, memory: &mut AddressSpace, value: u8) {
         memory[self.stack_pointer] = value;
         self.stack_pointer -= 1;
     }
 
-    pub fn _pop(&mut self, memory: &mut AddressSpace) -> u8 {
+    pub fn pop(&mut self, memory: &mut AddressSpace) -> u8 {
         let value = memory[self.stack_pointer + 1];
 
         self.stack_pointer += 1;
@@ -225,7 +247,7 @@ mod tests {
     use std::io::BufReader;
 
     const LOG_FILENAME: &str = "test/nestest.log";
-    const WORKING_UP_TO_LINE: u32 = 69;
+    const WORKING_UP_TO_LINE: u32 = 73;
 
     #[test]
     fn test_until_fail() -> Result<()> {
@@ -244,7 +266,7 @@ mod tests {
             if !line.contains(&operation_output) {
                 println!("Expected output: {}", line);
                 println!("Received output: {}", operation_output);
-                panic!("Mismatch in operation state.");
+                panic!("Mismatch in operation state at {}.", counter);
             }
 
             let cpu_state_output = format!(
@@ -252,7 +274,7 @@ mod tests {
                 cpu.a,
                 cpu.x,
                 cpu.y,
-                u8::from(&cpu.status),
+                u8::from(cpu.status.clone()),
                 cpu.stack.as_stack_offset(),
             );
 
@@ -261,7 +283,7 @@ mod tests {
             if !line.contains(&cpu_state_output) || !line.contains(&cyc) {
                 println!("Expected output: {}", line);
                 println!("Received output: {} __ {}", cpu_state_output, cyc);
-                panic!("Mismatch in cpu state.");
+                panic!("Mismatch in cpu state at {}.", counter);
             }
 
             operation.execute(&mut cpu);
