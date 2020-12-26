@@ -20,6 +20,7 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         Jsr::OPCODE => Box::new(Jsr::new(cpu)),
         0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => Box::new(Ldx::new(opcode_raw, cpu)),
         0x86 | 0x96 | 0x8E => Box::new(Stx::new(opcode_raw, cpu)),
+        0x85 => Box::new(Sta::new(opcode_raw, cpu)),
         0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => {
             Box::new(Lda::new(opcode_raw, cpu))
         }
@@ -29,6 +30,7 @@ pub fn next(cpu: &Cpu) -> Box<dyn Operation> {
         Bcc::OPCODE => Box::new(Bcc::new(cpu)),
         Beq::OPCODE => Box::new(Beq::new(cpu)),
         Bne::OPCODE => Box::new(Bne::new(cpu)),
+        Bit::OPCODE => Box::new(Bit::new(cpu)),
         _ => panic!("Unsupported {:X}", opcode_raw),
     }
 }
@@ -163,7 +165,7 @@ impl Operation for Ldx {
         cpu.cycles += u64::from(self.cycles);
         cpu.x = self.value;
 
-        cpu.status.update(cpu.x);
+        cpu.status.update_load(cpu.x);
     }
 
     fn dump(&self, _cpu: &Cpu) -> String {
@@ -215,10 +217,10 @@ impl Operation for Lda {
     /// JMP simply moves to the address.
     fn execute(&self, cpu: &mut Cpu) {
         cpu.program_counter += self.mode.get_bytes() as u16;
-        cpu.accumulator = self.value;
+        cpu.a = self.value;
 
         cpu.cycles += u64::from(self.cycles);
-        cpu.status.update(cpu.accumulator);
+        cpu.status.update_load(cpu.a);
     }
 
     fn dump(&self, _cpu: &Cpu) -> String {
@@ -279,6 +281,59 @@ impl Operation for Stx {
 
         format!(
             "{:02X} {:02X}     STX  {}",
+            self.opcode_raw, self.zero_page_addr, addr_string
+        )
+    }
+}
+
+struct Sta {
+    opcode_raw: u8,
+
+    /// Only Absolute and Indirect are valid modes.
+    mode: AddressingMode,
+
+    /// Number of cycles this operation takes.
+    cycles: u8,
+
+    /// Address to store value in register x.
+    zero_page_addr: u8,
+}
+
+impl Sta {
+    pub fn new(opcode_raw: u8, cpu: &Cpu) -> Self {
+        let pc = cpu.program_counter as usize;
+        let zero_page_addr = cpu.memory[pc + 1];
+        match opcode_raw {
+            // Immediate.
+            0x85 => Sta {
+                opcode_raw,
+                mode: AddressingMode::ZeroPage,
+                cycles: 3,
+                zero_page_addr,
+            },
+            _ => panic!("Unsupported {}", opcode_raw),
+        }
+    }
+}
+
+impl Operation for Sta {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += self.mode.get_bytes() as u16;
+        cpu.memory[self.zero_page_addr as usize] = cpu.a;
+        cpu.cycles += u64::from(self.cycles);
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        let addr_string = match self.mode {
+            AddressingMode::ZeroPage => format!(
+                "${:02X} = {:02X}",
+                self.zero_page_addr, cpu.memory[self.zero_page_addr as usize]
+            ),
+            _ => panic!("Unsupported!"),
+        };
+
+        format!(
+            "{:02X} {:02X}     STA  {}",
             self.opcode_raw, self.zero_page_addr, addr_string
         )
     }
@@ -523,6 +578,46 @@ impl Operation for Bne {
             Self::OPCODE,
             self.relative_value,
             cpu.program_counter + self.relative_value as u16 + 2
+        )
+    }
+}
+
+/// Bit test.
+///
+/// And the memory with what is in the accumulator and set flags.
+struct Bit {
+    /// Address of the memory to test.
+    zero_page_addr: u8,
+}
+
+impl Bit {
+    const OPCODE: u8 = 0x24;
+
+    pub fn new(cpu: &Cpu) -> Self {
+        let zero_page_addr = cpu.memory[(cpu.program_counter + 1) as usize];
+
+        Bit { zero_page_addr }
+    }
+}
+
+impl Operation for Bit {
+    fn execute(&self, cpu: &mut Cpu) {
+        cpu.program_counter += 2;
+        cpu.cycles += 3;
+
+        let test_value = cpu.memory[self.zero_page_addr as usize];
+
+        let result = test_value & cpu.a;
+        cpu.status.update_bit(result);
+    }
+
+    fn dump(&self, cpu: &Cpu) -> String {
+        format!(
+            "{:02X} {:02X}     BIT  ${:02X} = {:02X}   ",
+            Self::OPCODE,
+            self.zero_page_addr,
+            self.zero_page_addr,
+            cpu.memory[self.zero_page_addr as usize]
         )
     }
 }

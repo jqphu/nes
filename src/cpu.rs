@@ -31,7 +31,7 @@ pub struct Cpu {
     pub status: ProcessorStatus,
 
     /// Accumulator.
-    pub accumulator: u8,
+    pub a: u8,
 
     /// Index register X.
     pub x: u8,
@@ -63,7 +63,7 @@ impl Cpu {
             program_counter: 0xc000,
             stack: Stack::new(),
             status: ProcessorStatus::new(),
-            accumulator: 0,
+            a: 0,
             x: 0,
             y: 0,
             memory: [0; MEMORY_SIZE_MAX],
@@ -85,7 +85,7 @@ impl Cpu {
                 "{:X}  {} \t A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP: {:02X} CYC: {}",
                 self.program_counter,
                 &operation.dump(self),
-                self.accumulator,
+                self.a,
                 self.x,
                 self.y,
                 u8::from(&self.status),
@@ -122,6 +122,8 @@ pub struct ProcessorStatus {
 }
 
 impl ProcessorStatus {
+    const NEGATIVE_MASK: u8 = 0b1000_0000;
+    const OVERFLOW_MASK: u8 = 0b0100_0000;
     fn new() -> Self {
         ProcessorStatus {
             carry: false,
@@ -133,10 +135,14 @@ impl ProcessorStatus {
         }
     }
 
-    pub fn update(&mut self, value: u8) {
+    pub fn update_load(&mut self, value: u8) {
         self.zero = value == 0;
-        // Bit 7 is set
-        self.negative = value & 0b10000000 == 1;
+        self.negative = value & ProcessorStatus::NEGATIVE_MASK == ProcessorStatus::NEGATIVE_MASK;
+    }
+
+    pub fn update_bit(&mut self, value: u8) {
+        self.update_load(value);
+        self.overflow = value & ProcessorStatus::OVERFLOW_MASK == ProcessorStatus::OVERFLOW_MASK;
     }
 }
 
